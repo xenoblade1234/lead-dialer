@@ -1,0 +1,260 @@
+package de.leaddialer
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import android.text.InputType
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import de.leaddialer.databinding.ActivityMainBinding
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var b: ActivityMainBinding
+    private lateinit var db: LeadDb
+    private val adapter = LeadAdapter { showLead(it) }
+    private var pendingLeadId = -1L
+
+    private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importCsv(uri)
+    }
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) exportCsv(uri)
+    }
+    private val callPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startDialer(pendingLeadId) else toast("Ohne Anruf-Berechtigung kann die App nicht wählen.")
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        b = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(b.root)
+        db = LeadDb(this)
+
+        b.list.layoutManager = LinearLayoutManager(this)
+        b.list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
+        b.list.adapter = adapter
+        b.startButton.setOnClickListener { startDialer(-1L) }
+        b.emptyText.text = "Noch keine Leads.\n\nOben rechts im Menü: \"CSV importieren\" oder \"Lead hinzufügen\".\n\n" +
+            "Die CSV braucht eine Spalte \"Telefon\", optional \"Name\", \"Firma\", \"Notiz\"."
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+    }
+
+    private fun refresh() {
+        val leads = db.all()
+        adapter.items = leads
+        val open = db.queue(Prefs.maxAttempts(this)).size
+        val appointments = leads.count { it.status == Status.TERMIN }
+        b.stats.text = "${leads.size} Leads · $open offen · $appointments Termine"
+        b.startButton.isEnabled = open > 0
+        b.startButton.text = if (open > 0) "Wählen starten ($open)" else "Keine offenen Leads"
+        b.emptyText.isVisible = leads.isEmpty()
+    }
+
+    private fun startDialer(leadId: Long) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            pendingLeadId = leadId
+            callPermission.launch(Manifest.permission.CALL_PHONE)
+            return
+        }
+        startActivity(Intent(this, DialerActivity::class.java).putExtra(DialerActivity.EXTRA_LEAD_ID, leadId))
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, MENU_IMPORT, 0, "CSV importieren")
+        menu.add(0, MENU_ADD, 1, "Lead hinzufügen")
+        menu.add(0, MENU_EXPORT, 2, "CSV exportieren")
+        menu.add(0, MENU_SETTINGS, 3, "Einstellungen")
+        menu.add(0, MENU_CLEAR, 4, "Alle Leads löschen")
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            MENU_IMPORT -> importLauncher.launch(arrayOf("*/*"))
+            MENU_ADD -> addLead()
+            MENU_EXPORT -> exportLauncher.launch("leads_" + SimpleDateFormat("yyyy-MM-dd", Locale.GERMANY).format(Date()) + ".csv")
+            MENU_SETTINGS -> showSettings()
+            MENU_CLEAR -> confirm("Wirklich alle Leads löschen?", "Das kann nicht rückgängig gemacht werden.") {
+                db.deleteAll()
+                refresh()
+            }
+            else -> return super.onOptionsItemSelected(item)
+        }
+        return true
+    }
+
+    private fun importCsv(uri: Uri) {
+        Thread {
+            val result = runCatching {
+                val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                val leads = CsvIO.parse(CsvIO.decode(bytes))
+                leads.size to db.insertAll(leads)
+            }
+            runOnUiThread {
+                result.onSuccess { (found, added) ->
+                    val msg = if (found == 0) {
+                        "Keine Telefonnummern gefunden. Die CSV braucht eine Spalte wie \"Telefon\"."
+                    } else {
+                        "$found Leads gefunden, $added neu hinzugefügt." +
+                            if (found > added) "\n${found - added} Duplikate übersprungen." else ""
+                    }
+                    MaterialAlertDialogBuilder(this).setTitle("Import").setMessage(msg).setPositiveButton("OK", null).show()
+                    refresh()
+                }.onFailure { toast("Import fehlgeschlagen: ${it.message}") }
+            }
+        }.start()
+    }
+
+    private fun exportCsv(uri: Uri) {
+        runCatching {
+            contentResolver.openOutputStream(uri)!!.use { it.write(CsvIO.export(db.all()).toByteArray(Charsets.UTF_8)) }
+        }.onSuccess { toast("Export gespeichert") }
+            .onFailure { toast("Export fehlgeschlagen: ${it.message}") }
+    }
+
+    private fun showLead(l: Lead) {
+        val msg = buildString {
+            appendLine(l.phone)
+            if (l.company.isNotBlank()) appendLine(l.company)
+            appendLine()
+            appendLine("Status: ${l.status.label}")
+            appendLine("Versuche: ${l.attempts}")
+            if (l.lastCall > 0) appendLine("Zuletzt: " + SimpleDateFormat("dd.MM.yy HH:mm", Locale.GERMANY).format(Date(l.lastCall)))
+            if (l.note.isNotBlank()) {
+                appendLine()
+                append(l.note)
+            }
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(l.name.ifBlank { l.phone })
+            .setMessage(msg)
+            .setPositiveButton("Anrufen") { _, _ -> startDialer(l.id) }
+            .setNeutralButton("Status ändern") { _, _ -> changeStatus(l) }
+            .setNegativeButton("Löschen") { _, _ ->
+                confirm("Lead löschen?", l.name.ifBlank { l.phone }) {
+                    db.delete(l.id)
+                    refresh()
+                }
+            }
+            .show()
+    }
+
+    private fun changeStatus(l: Lead) {
+        val statuses = Status.values()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Status ändern")
+            .setSingleChoiceItems(statuses.map { it.label }.toTypedArray(), statuses.indexOf(l.status)) { d, which ->
+                l.status = statuses[which]
+                // Back to "Neu" puts the lead fully back into the call queue.
+                if (l.status == Status.NEU) l.attempts = 0
+                db.update(l)
+                refresh()
+                d.dismiss()
+            }
+            .show()
+    }
+
+    private fun addLead() {
+        val name = field("Name", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+        val phone = field("Telefonnummer", InputType.TYPE_CLASS_PHONE)
+        val company = field("Firma (optional)", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Lead hinzufügen")
+            .setView(form(name, phone, company))
+            .setPositiveButton("Speichern") { _, _ ->
+                val number = CsvIO.cleanPhone(phone.text.toString())
+                if (number.count { it.isDigit() } < 5) {
+                    toast("Ungültige Telefonnummer")
+                } else {
+                    val added = db.insertAll(listOf(Lead(name = name.text.toString().trim(), phone = number, company = company.text.toString().trim())))
+                    if (added == 0) toast("Diese Nummer gibt es schon")
+                    refresh()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun showSettings() {
+        val countdown = field("", InputType.TYPE_CLASS_NUMBER, Prefs.countdown(this).toString())
+        val maxAttempts = field("", InputType.TYPE_CLASS_NUMBER, Prefs.maxAttempts(this).toString())
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Einstellungen")
+            .setView(
+                form(
+                    label("Sekunden Pause vor dem nächsten Anruf (0 = sofort)"), countdown,
+                    label("Max. Versuche bei \"Nicht erreicht\" / \"Mailbox\""), maxAttempts,
+                )
+            )
+            .setPositiveButton("Speichern") { _, _ ->
+                Prefs.save(
+                    this,
+                    countdown.text.toString().toIntOrNull()?.coerceIn(0, 120) ?: 5,
+                    maxAttempts.text.toString().toIntOrNull()?.coerceIn(1, 20) ?: 3,
+                )
+                refresh()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun confirm(title: String, message: String, action: () -> Unit) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Ja") { _, _ -> action() }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun field(hint: String, type: Int, value: String = "") = EditText(this).apply {
+        this.hint = hint
+        inputType = type
+        setText(value)
+    }
+
+    private fun label(text: String) = TextView(this).apply {
+        this.text = text
+        setPadding(0, dp(12), 0, 0)
+    }
+
+    private fun form(vararg views: View) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(24), dp(8), dp(24), 0)
+        views.forEach { addView(it) }
+    }
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+
+    private companion object {
+        const val MENU_IMPORT = 1
+        const val MENU_ADD = 2
+        const val MENU_EXPORT = 3
+        const val MENU_SETTINGS = 4
+        const val MENU_CLEAR = 5
+    }
+}

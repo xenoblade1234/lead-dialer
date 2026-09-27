@@ -23,23 +23,22 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      # One fixed signing key, created on the very first run and committed, so every
-      # later APK installs as an update and keeps the leads on the phone.
-      - name: Create signing key (first run only)
+      # One fixed signing key from repo secrets (see setup-signing.sh), so every
+      # APK installs as an update and keeps the leads on the phone.
+      - name: Restore signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [ ! -f keystore/dialer.jks ]; then
-            mkdir -p keystore
-            keytool -genkeypair -keystore keystore/dialer.jks -storetype PKCS12 \
-              -alias dialer -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass leaddialer -keypass leaddialer -dname "CN=Lead Dialer"
-            git config user.name "github-actions"
-            git config user.email "github-actions@users.noreply.github.com"
-            git add keystore/dialer.jks
-            git commit -m "Add signing key [skip ci]"
-            git push
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::Secret KEYSTORE_B64 fehlt. Bitte setup-signing.sh ausführen."
+            exit 1
           fi
+          mkdir -p keystore
+          echo "$KEYSTORE_B64" | base64 -d > keystore/dialer.jks
 
       - name: Build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: gradle assembleRelease --no-daemon
 
       - name: Rename APK

@@ -18,14 +18,15 @@ android {
         versionName = "1.0.$buildNumber"
     }
 
-    // Fixed key (created once by CI, committed to the private repo) so updates
-    // install over the old version without losing the lead database.
+    // Fixed key (decoded from GitHub secrets in CI) so updates install over the
+    // old version without losing the lead database.
     signingConfigs {
         create("fixed") {
+            val pw = System.getenv("KEYSTORE_PASSWORD") ?: ""
             storeFile = rootProject.file("keystore/dialer.jks")
-            storePassword = "leaddialer"
+            storePassword = pw
             keyAlias = "dialer"
-            keyPassword = "leaddialer"
+            keyPassword = pw
         }
     }
 

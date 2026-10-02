@@ -25,6 +25,8 @@ data class Lead(
     var status: Status = Status.NEU,
     var attempts: Int = 0,
     var lastCall: Long = 0,
+    /** Name of the import this lead came from; "" for leads from before lists existed. */
+    var list: String = "",
 )
 
 object Prefs {
@@ -33,7 +35,22 @@ object Prefs {
     fun countdown(c: Context) = prefs(c).getInt("countdown", 5)
     fun maxAttempts(c: Context) = prefs(c).getInt("maxAttempts", 3)
 
-    fun save(c: Context, countdown: Int, maxAttempts: Int) {
-        prefs(c).edit().putInt("countdown", countdown).putInt("maxAttempts", maxAttempts).apply()
+    /** Outcome saved when the after-call timer runs out untouched; null keeps the status as it was. */
+    fun defaultOutcome(c: Context): Status? =
+        prefs(c).getString("defaultOutcome", Status.MAILBOX.name).let { n -> Status.values().firstOrNull { it.name == n } }
+
+    /** Selected list on the main screen; null means all lists. */
+    fun selectedList(c: Context): String? = prefs(c).getString("selectedList", null)
+
+    fun setSelectedList(c: Context, list: String?) {
+        prefs(c).edit().putString("selectedList", list).apply()
+    }
+
+    fun save(c: Context, countdown: Int, maxAttempts: Int, defaultOutcome: Status?) {
+        prefs(c).edit()
+            .putInt("countdown", countdown)
+            .putInt("maxAttempts", maxAttempts)
+            .putString("defaultOutcome", defaultOutcome?.name ?: "NONE")
+            .apply()
     }
 }

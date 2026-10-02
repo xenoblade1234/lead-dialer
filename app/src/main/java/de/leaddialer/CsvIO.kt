@@ -77,11 +77,11 @@ object CsvIO {
     fun export(leads: List<Lead>): String {
         val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMANY)
         val sb = StringBuilder("﻿")
-        sb.append("Name;Telefon;Firma;Status;Versuche;Letzter Anruf;Notiz\r\n")
+        sb.append("Name;Telefon;Firma;Status;Versuche;Letzter Anruf;Notiz;Liste\r\n")
         for (l in leads) {
             val cells = listOf(
                 l.name, l.phone, l.company, l.status.label, l.attempts.toString(),
-                if (l.lastCall > 0) fmt.format(Date(l.lastCall)) else "", l.note,
+                if (l.lastCall > 0) fmt.format(Date(l.lastCall)) else "", l.note, l.list,
             )
             sb.append(cells.joinToString(";") { escape(it) }).append("\r\n")
         }

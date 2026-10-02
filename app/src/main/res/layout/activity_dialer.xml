@@ -111,9 +111,41 @@
             android:visibility="gone">
 
             <TextView
+                android:id="@+id/outcomeTimer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/outcomePause"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="Pause" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/nextNow"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="Jetzt weiter" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/outcomeHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
                 android:text="Wie lief der Anruf?"
                 android:textSize="18sp"
                 android:textStyle="bold" />

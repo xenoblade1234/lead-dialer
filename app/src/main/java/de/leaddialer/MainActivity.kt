@@ -304,7 +304,7 @@ class MainActivity : AppCompatActivity() {
                 val picked = outcomeChoices.getOrNull(outcomeGroup.checkedRadioButtonId - 1000)
                 Prefs.save(
                     this,
-                    countdown.text.toString().toIntOrNull()?.coerceIn(0, 120) ?: 5,
+                    countdown.text.toString().toIntOrNull()?.coerceIn(0, 120) ?: 3,
                     maxAttempts.text.toString().toIntOrNull()?.coerceIn(1, 20) ?: 3,
                     if (picked != null) picked.first else current,
                 )

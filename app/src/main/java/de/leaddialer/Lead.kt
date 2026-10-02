@@ -32,7 +32,8 @@ data class Lead(
 object Prefs {
     private fun prefs(c: Context) = c.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    fun countdown(c: Context) = prefs(c).getInt("countdown", 5)
+    // New key so phones that saved the old 5 s default also start at 3 s.
+    fun countdown(c: Context) = prefs(c).getInt("countdownSec", 3)
     fun maxAttempts(c: Context) = prefs(c).getInt("maxAttempts", 3)
 
     /** Outcome saved when the after-call timer runs out untouched; null keeps the status as it was. */
@@ -48,7 +49,7 @@ object Prefs {
 
     fun save(c: Context, countdown: Int, maxAttempts: Int, defaultOutcome: Status?) {
         prefs(c).edit()
-            .putInt("countdown", countdown)
+            .putInt("countdownSec", countdown)
             .putInt("maxAttempts", maxAttempts)
             .putString("defaultOutcome", defaultOutcome?.name ?: "NONE")
             .apply()

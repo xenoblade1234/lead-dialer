@@ -192,6 +192,9 @@ class DialerActivity : AppCompatActivity() {
             return
         }
         state = State.READY
+        // Outcome and note belong to one lead; a redial of the same lead keeps them.
+        chosen = if (auto) Prefs.defaultOutcome(this) else null
+        b.noteInput.setText("")
         render()
         when {
             paused -> {}
@@ -202,12 +205,14 @@ class DialerActivity : AppCompatActivity() {
         }
     }
 
+    /** Back from a call. Auto mode saves what was picked during the call and dials on at once. */
     private fun enterOutcome() {
         state = State.OUTCOME
-        chosen = if (auto) Prefs.defaultOutcome(this) else null
-        b.noteInput.setText("")
+        if (auto && !paused && !single) {
+            commitOutcome()
+            return
+        }
         render()
-        if (auto && !paused) startTimer()
     }
 
     /** One timer for both phases: before a call it dials, after a call it saves and moves on. */
@@ -303,14 +308,24 @@ class DialerActivity : AppCompatActivity() {
             b.previousNote.text = lead.note
             b.previousNote.isVisible = lead.note.isNotBlank()
         }
+        // In auto mode the outcome is picked during the call (switch to the app while talking);
+        // hanging up then dials the next lead straight away.
+        val duringCall = auto && state == State.CALLING
         b.leadCard.isVisible = lead != null && state != State.DONE
         b.controls.isVisible = state == State.READY
-        b.outcomeBox.isVisible = state == State.OUTCOME
+        b.outcomeBox.isVisible = state == State.OUTCOME || duringCall
         b.doneText.isVisible = state == State.DONE
-        b.countdown.isVisible = state == State.READY || state == State.CALLING
+        b.countdown.isVisible = state == State.READY || (state == State.CALLING && !auto)
+        b.btnRedial.isVisible = state == State.OUTCOME
         when (state) {
             State.CALLING -> {
                 b.countdown.text = "Anruf läuft …"
+                if (auto) {
+                    b.outcomeTimer.text = if (paused) "Anruf läuft · danach Stopp" else "Anruf läuft …"
+                    b.outcomeHint.text = "Ergebnis: " + (chosen?.label ?: "Status bleibt") +
+                        if (paused) "" else ". Nach dem Auflegen kommt sofort der nächste Anruf."
+                    outcomeButtons.forEach { (status, button) -> styleOutcome(button, status) }
+                }
             }
             State.READY -> {
                 if (timer == null) b.countdown.text = if (paused) "Pausiert" else if (auto) "Bereit" else "Tippe auf Anrufen"
@@ -330,10 +345,10 @@ class DialerActivity : AppCompatActivity() {
         // Pause and "Jetzt weiter" only make sense while a timer drives the session.
         b.pauseButton.isVisible = auto
         b.outcomePause.isVisible = auto
-        b.nextNow.isVisible = auto
+        b.nextNow.isVisible = auto && !duringCall
         val pauseText = if (paused) "Weiter" else "Pause"
         b.pauseButton.text = pauseText
-        b.outcomePause.text = pauseText
+        b.outcomePause.text = if (duringCall) (if (paused) "Doch weiterwählen" else "Nach diesem Anruf stoppen") else pauseText
         b.nextNow.text = if (single) "Speichern" else "Jetzt weiter"
         b.endButton.text = if (state == State.DONE) "Zurück zur Liste" else "Session beenden"
     }

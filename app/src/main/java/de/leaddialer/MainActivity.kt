@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
     /** Asked at every session start; the last choice is preselected. */
     private fun chooseMode() {
         val options = arrayOf(
-            "Automatisch weiterwählen\nNach dem Auflegen ${Prefs.countdown(this)} s, dann der nächste Anruf",
+            "Automatisch weiterwählen\nNach dem Auflegen sofort der nächste Anruf",
             "Nach jedem Anruf pausieren\nErgebnis antippen, nächsten Anruf selbst starten",
         )
         var auto = Prefs.autoMode(this)
@@ -315,7 +315,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Einstellungen")
             .setView(
                 form(
-                    label("Sekunden bis zum nächsten Anruf (0 = sofort)"), countdown,
+                    label("Sekunden vor dem ersten Anruf und nach Überspringen (0 = sofort)"), countdown,
                     label("Max. Versuche bei \"Nicht erreicht\" / \"Mailbox\""), maxAttempts,
                     label("Ergebnis, wenn du nach dem Auflegen nichts antippst"), outcomeGroup,
                 )

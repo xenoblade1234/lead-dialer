@@ -40,6 +40,13 @@ object Prefs {
     fun defaultOutcome(c: Context): Status? =
         prefs(c).getString("defaultOutcome", Status.MAILBOX.name).let { n -> Status.values().firstOrNull { it.name == n } }
 
+    /** Session mode picked at the start: true dials on by itself, false pauses after each call. */
+    fun autoMode(c: Context) = prefs(c).getBoolean("autoMode", true)
+
+    fun setAutoMode(c: Context, auto: Boolean) {
+        prefs(c).edit().putBoolean("autoMode", auto).apply()
+    }
+
     /** Selected list on the main screen; null means all lists. */
     fun selectedList(c: Context): String? = prefs(c).getString("selectedList", null)
 

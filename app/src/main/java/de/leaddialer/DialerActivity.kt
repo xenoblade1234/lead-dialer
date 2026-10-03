@@ -13,7 +13,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
-import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import de.leaddialer.databinding.ActivityDialerBinding
 import java.text.SimpleDateFormat
@@ -32,7 +31,11 @@ class DialerActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_LEAD_ID = "leadId"
         const val EXTRA_LIST = "list"
+        /** true: dial the next lead by itself after each call; false: wait for an outcome and a tap. */
+        const val EXTRA_AUTO = "auto"
     }
+
+    private val auto by lazy { intent.getBooleanExtra(EXTRA_AUTO, true) }
 
     private enum class State { READY, CALLING, OUTCOME, DONE }
 
@@ -48,7 +51,8 @@ class DialerActivity : AppCompatActivity() {
     private var timer: CountDownTimer? = null
     /** Outcome that will be saved when the after-call timer ends; null keeps the old status. */
     private var chosen: Status? = null
-    private var fillingNote = false
+    /** Timer stopped only because the app left the foreground; restarts on return. Never set by the user. */
+    private var suspended = false
 
     private val outcomeButtons by lazy {
         mapOf(
@@ -97,17 +101,14 @@ class DialerActivity : AppCompatActivity() {
         b.btnRedial.setOnClickListener { placeCall() }
         outcomeButtons.forEach { (status, button) ->
             button.setOnClickListener {
-                // Tapping the selected outcome again clears it.
-                chosen = if (chosen == status) null else status
-                render()
-            }
-        }
-        // Writing a note should not be cut off by the timer.
-        b.noteInput.doAfterTextChanged {
-            if (!fillingNote && state == State.OUTCOME && !paused && !it.isNullOrEmpty()) {
-                paused = true
-                stopTimer()
-                render()
+                if (auto) {
+                    // Auto mode only picks what the timer saves; tapping it again clears it.
+                    chosen = if (chosen == status) null else status
+                    render()
+                } else {
+                    chosen = status
+                    commitOutcome()
+                }
             }
         }
 
@@ -121,8 +122,9 @@ class DialerActivity : AppCompatActivity() {
             state = State.valueOf(saved.getString("state") ?: State.READY.name)
             leftForCall = saved.getBoolean("leftForCall")
             chosen = saved.getString("chosen")?.let { n -> Status.values().firstOrNull { it.name == n } }
-            // A running timer does not survive recreation, so come back paused.
-            paused = saved.getBoolean("paused") || state == State.READY || state == State.OUTCOME
+            // A running timer does not survive recreation; onResume starts it again.
+            paused = saved.getBoolean("paused")
+            suspended = state == State.READY || state == State.OUTCOME
             current = queue.getOrNull(index)?.let { db.get(it) }
             render()
         }
@@ -141,11 +143,11 @@ class DialerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         if (state == State.CALLING) leftForCall = true
-        // Never dial while the user is in another app.
+        // Never dial while the app is in the background, but do not count that as a pause:
+        // the timer starts over as soon as the app is back in front.
         if ((state == State.READY || state == State.OUTCOME) && timer != null) {
             stopTimer()
-            paused = true
-            render()
+            suspended = true
         }
     }
 
@@ -153,7 +155,12 @@ class DialerActivity : AppCompatActivity() {
         super.onResume()
         if (state == State.CALLING && leftForCall) {
             leftForCall = false
+            suspended = false
             enterOutcome()
+        } else if (suspended) {
+            suspended = false
+            if (auto && !paused && (state == State.READY || state == State.OUTCOME)) startTimer()
+            render()
         }
     }
 
@@ -188,19 +195,19 @@ class DialerActivity : AppCompatActivity() {
         render()
         when {
             paused -> {}
-            single || callNow -> placeCall()
+            single -> placeCall()
+            !auto -> {}             // pause mode: the user taps "Anrufen"
+            callNow -> placeCall()
             else -> startTimer()
         }
     }
 
     private fun enterOutcome() {
         state = State.OUTCOME
-        chosen = Prefs.defaultOutcome(this)
-        fillingNote = true
+        chosen = if (auto) Prefs.defaultOutcome(this) else null
         b.noteInput.setText("")
-        fillingNote = false
         render()
-        if (!paused) startTimer()
+        if (auto && !paused) startTimer()
     }
 
     /** One timer for both phases: before a call it dials, after a call it saves and moves on. */
@@ -306,15 +313,24 @@ class DialerActivity : AppCompatActivity() {
                 b.countdown.text = "Anruf läuft …"
             }
             State.READY -> {
-                if (timer == null) b.countdown.text = if (paused) "Pausiert" else "Bereit"
+                if (timer == null) b.countdown.text = if (paused) "Pausiert" else if (auto) "Bereit" else "Tippe auf Anrufen"
             }
             State.OUTCOME -> {
-                if (timer == null) b.outcomeTimer.text = if (paused) "Pausiert" else "Weiter …"
-                b.outcomeHint.text = "Ergebnis: " + (chosen?.label ?: "Status bleibt")
+                if (auto) {
+                    if (timer == null) b.outcomeTimer.text = if (paused) "Pausiert" else "Weiter …"
+                    b.outcomeHint.text = "Ergebnis: " + (chosen?.label ?: "Status bleibt")
+                } else {
+                    b.outcomeTimer.text = "Wie lief der Anruf?"
+                    b.outcomeHint.text = "Ergebnis antippen, dann kommt der nächste Lead"
+                }
                 outcomeButtons.forEach { (status, button) -> styleOutcome(button, status) }
             }
             else -> {}
         }
+        // Pause and "Jetzt weiter" only make sense while a timer drives the session.
+        b.pauseButton.isVisible = auto
+        b.outcomePause.isVisible = auto
+        b.nextNow.isVisible = auto
         val pauseText = if (paused) "Weiter" else "Pause"
         b.pauseButton.text = pauseText
         b.outcomePause.text = pauseText

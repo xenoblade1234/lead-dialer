@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         b.list.layoutManager = LinearLayoutManager(this)
         b.list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
         b.list.adapter = adapter
-        b.startButton.setOnClickListener { startDialer(-1L) }
+        b.startButton.setOnClickListener { chooseMode() }
         b.listButton.setOnClickListener { chooseList() }
         b.emptyText.text = "Noch keine Leads.\n\nOben rechts im Menü: \"CSV importieren\" oder \"Lead hinzufügen\".\n\n" +
             "Die CSV braucht eine Spalte \"Telefon\", optional \"Name\", \"Firma\", \"Notiz\"."
@@ -106,13 +106,33 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /** Asked at every session start; the last choice is preselected. */
+    private fun chooseMode() {
+        val options = arrayOf(
+            "Automatisch weiterwählen\nNach dem Auflegen ${Prefs.countdown(this)} s, dann der nächste Anruf",
+            "Nach jedem Anruf pausieren\nErgebnis antippen, nächsten Anruf selbst starten",
+        )
+        var auto = Prefs.autoMode(this)
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Wie willst du telefonieren?")
+            .setSingleChoiceItems(options, if (auto) 0 else 1) { _, which -> auto = which == 0 }
+            .setPositiveButton("Los geht's") { _, _ ->
+                Prefs.setAutoMode(this, auto)
+                startDialer(-1L)
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
     private fun startDialer(leadId: Long) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
             pendingLeadId = leadId
             callPermission.launch(Manifest.permission.CALL_PHONE)
             return
         }
-        val intent = Intent(this, DialerActivity::class.java).putExtra(DialerActivity.EXTRA_LEAD_ID, leadId)
+        val intent = Intent(this, DialerActivity::class.java)
+            .putExtra(DialerActivity.EXTRA_LEAD_ID, leadId)
+            .putExtra(DialerActivity.EXTRA_AUTO, Prefs.autoMode(this))
         if (leadId < 0) selectedList()?.let { intent.putExtra(DialerActivity.EXTRA_LIST, it) }
         startActivity(intent)
     }

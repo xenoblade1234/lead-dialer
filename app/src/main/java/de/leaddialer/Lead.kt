@@ -32,11 +32,9 @@ data class Lead(
 object Prefs {
     private fun prefs(c: Context) = c.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    // New key so phones that saved the old 5 s default also start at 3 s.
-    fun countdown(c: Context) = prefs(c).getInt("countdownSec", 3)
     fun maxAttempts(c: Context) = prefs(c).getInt("maxAttempts", 3)
 
-    /** Outcome saved when the after-call timer runs out untouched; null keeps the status as it was. */
+    /** Outcome saved in auto mode when none was tapped during the call; null keeps the status as it was. */
     fun defaultOutcome(c: Context): Status? =
         prefs(c).getString("defaultOutcome", Status.MAILBOX.name).let { n -> Status.values().firstOrNull { it.name == n } }
 
@@ -54,9 +52,8 @@ object Prefs {
         prefs(c).edit().putString("selectedList", list).apply()
     }
 
-    fun save(c: Context, countdown: Int, maxAttempts: Int, defaultOutcome: Status?) {
+    fun save(c: Context, maxAttempts: Int, defaultOutcome: Status?) {
         prefs(c).edit()
-            .putInt("countdownSec", countdown)
             .putInt("maxAttempts", maxAttempts)
             .putString("defaultOutcome", defaultOutcome?.name ?: "NONE")
             .apply()

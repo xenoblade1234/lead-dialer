@@ -293,7 +293,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showSettings() {
-        val countdown = field("", InputType.TYPE_CLASS_NUMBER, Prefs.countdown(this).toString())
         val maxAttempts = field("", InputType.TYPE_CLASS_NUMBER, Prefs.maxAttempts(this).toString())
         // Choices for the outcome saved when the after-call timer runs out untouched.
         val outcomeChoices = listOf<Pair<Status?, String>>(
@@ -315,16 +314,14 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Einstellungen")
             .setView(
                 form(
-                    label("Sekunden vor dem ersten Anruf und nach Überspringen (0 = sofort)"), countdown,
                     label("Max. Versuche bei \"Nicht erreicht\" / \"Mailbox\""), maxAttempts,
-                    label("Ergebnis, wenn du nach dem Auflegen nichts antippst"), outcomeGroup,
+                    label("Ergebnis beim automatischen Weiterwählen, wenn du nichts antippst"), outcomeGroup,
                 )
             )
             .setPositiveButton("Speichern") { _, _ ->
                 val picked = outcomeChoices.getOrNull(outcomeGroup.checkedRadioButtonId - 1000)
                 Prefs.save(
                     this,
-                    countdown.text.toString().toIntOrNull()?.coerceIn(0, 120) ?: 3,
                     maxAttempts.text.toString().toIntOrNull()?.coerceIn(1, 20) ?: 3,
                     if (picked != null) picked.first else current,
                 )

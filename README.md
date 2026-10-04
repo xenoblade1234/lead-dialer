@@ -4,7 +4,7 @@ Android-App, die eine Lead-Liste automatisch nacheinander anruft.
 
 ## Ablauf
 
-1. CSV importieren (Menü oben rechts). Nötig ist eine Spalte `Telefon`, optional `Name`, `Vorname`/`Nachname`, `Firma`, `Notiz`. Trennzeichen `;` oder `,`, Excel-Export funktioniert. Jeder Import wird eine eigene **Liste**; oben wählst du, welche Liste angezeigt und angerufen wird.
+1. CSV oder Excel (.xlsx) importieren (Menü oben rechts). Die Telefonspalte wird über die Überschrift oder am Inhalt erkannt, optional `Name`, `Vorname`/`Nachname`, `Firma`, `Notiz`. Trennzeichen `;` oder `,`, Excel-Export funktioniert. Jeder Import wird eine eigene **Liste**; oben wählst du, welche Liste angezeigt und angerufen wird.
 2. **Wählen starten**: Du wählst "Automatisch weiterwählen" oder "Nach jedem Anruf pausieren". Automatisch ruft sofort den ersten Lead an.
 3. **Automatisch weiterwählen**: Nach dem Auflegen wird sofort der nächste Lead angerufen. Während des Gesprächs kannst du in die App wechseln, ein Ergebnis antippen (sonst wird das Standard-Ergebnis gespeichert, Standard: Mailbox) und "Nach diesem Anruf stoppen" wählen. **Nach jedem Anruf pausieren**: Ergebnis antippen, dann den nächsten Anruf selbst starten.
 4. **CSV exportieren** speichert alle Leads mit Status, Versuchen und Notizen.

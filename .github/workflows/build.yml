@@ -39,7 +39,7 @@ jobs:
       - name: Build
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: gradle assembleRelease --no-daemon
+        run: gradle testDebugUnitTest assembleRelease --no-daemon
 
       - name: Rename APK
         run: cp app/build/outputs/apk/release/app-release.apk LeadDialer.apk

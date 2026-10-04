@@ -201,13 +201,14 @@ class MainActivity : AppCompatActivity() {
         Thread {
             val result = runCatching {
                 val bytes = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-                val leads = CsvIO.parse(CsvIO.decode(bytes)).onEach { it.list = list }
+                val parsed = if (XlsxReader.isXlsx(bytes)) CsvIO.parseXlsx(bytes) else CsvIO.parse(CsvIO.decode(bytes))
+                val leads = parsed.onEach { it.list = list }
                 leads.size to db.insertAll(leads)
             }
             runOnUiThread {
                 result.onSuccess { (found, added) ->
                     val msg = if (found == 0) {
-                        "Keine Telefonnummern gefunden. Die CSV braucht eine Spalte wie \"Telefon\"."
+                        "Keine Telefonnummern gefunden. Die Datei muss eine CSV- oder Excel-Datei (.xlsx) mit einer Spalte voller Telefonnummern sein."
                     } else {
                         "$found Leads gefunden, $added in \"$list\" hinzugefügt." +
                             if (found > added) "\n${found - added} Duplikate übersprungen." else ""

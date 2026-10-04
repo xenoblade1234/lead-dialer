@@ -21,8 +21,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import de.leaddialer.databinding.ActivityMainBinding
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,7 +35,44 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private lateinit var db: LeadDb
-    private val adapter = LeadAdapter { showLead(it) }
+    private val adapter = LeadAdapter(onClick = { showLead(it) }, onStartDrag = { touchHelper.startDrag(it) })
+
+    /** Drag (handle or long press) reorders, a sideways swipe deletes with undo. */
+    private val touchHelper by lazy {
+        ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+        ) {
+            private var moved = false
+
+            override fun onMove(rv: RecyclerView, from: RecyclerView.ViewHolder, to: RecyclerView.ViewHolder): Boolean {
+                adapter.move(from.bindingAdapterPosition, to.bindingAdapterPosition)
+                moved = true
+                return true
+            }
+
+            override fun onSwiped(holder: RecyclerView.ViewHolder, direction: Int) {
+                val lead = adapter.removeAt(holder.bindingAdapterPosition)
+                db.delete(lead.id)
+                refreshStats()
+                Snackbar.make(b.root, "\"${lead.name.ifBlank { lead.phone }}\" gelöscht", Snackbar.LENGTH_LONG)
+                    .setAction("Rückgängig") {
+                        db.restore(lead)
+                        refresh()
+                    }
+                    .show()
+            }
+
+            // Saved once on drop, not on every step of the drag.
+            override fun clearView(rv: RecyclerView, holder: RecyclerView.ViewHolder) {
+                super.clearView(rv, holder)
+                if (moved) {
+                    moved = false
+                    db.reorder(adapter.items.map { it.id })
+                }
+            }
+        })
+    }
     private var pendingLeadId = -1L
 
     private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -54,6 +94,7 @@ class MainActivity : AppCompatActivity() {
         b.list.layoutManager = LinearLayoutManager(this)
         b.list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
         b.list.adapter = adapter
+        touchHelper.attachToRecyclerView(b.list)
         b.startButton.setOnClickListener { chooseMode() }
         b.listButton.setOnClickListener { chooseList() }
         b.emptyText.text = "Noch keine Leads.\n\nOben rechts im Menü: \"CSV importieren\" oder \"Lead hinzufügen\".\n\n" +
@@ -78,13 +119,19 @@ class MainActivity : AppCompatActivity() {
     private fun listLabel(list: String) = list.ifEmpty { "Ohne Liste" }
 
     private fun refresh() {
+        adapter.submit(db.all(selectedList()))
+        refreshStats()
+    }
+
+    /** Header and counts only; leaves the list alone so a swipe animation is not cut off. */
+    private fun refreshStats() {
         val sel = selectedList()
-        val leads = db.all(sel)
-        adapter.items = leads
+        val leads = adapter.items
         val open = db.queue(Prefs.maxAttempts(this), sel).size
         val appointments = leads.count { it.status == Status.TERMIN }
         b.listButton.text = "Liste: " + (sel?.let { listLabel(it) } ?: "Alle Listen") + "  ▾"
-        b.stats.text = "${leads.size} Leads · $open offen · $appointments Termine"
+        b.stats.text = "${leads.size} Leads · $open offen · $appointments Termine" +
+            if (leads.isNotEmpty()) "\n☰ ziehen zum Sortieren · zur Seite wischen zum Löschen" else ""
         b.startButton.isEnabled = open > 0
         b.startButton.text = if (open > 0) "Wählen starten ($open)" else "Keine offenen Leads"
         b.emptyText.isVisible = leads.isEmpty()

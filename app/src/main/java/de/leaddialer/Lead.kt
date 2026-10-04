@@ -27,6 +27,8 @@ data class Lead(
     var lastCall: Long = 0,
     /** Name of the import this lead came from; "" for leads from before lists existed. */
     var list: String = "",
+    /** Manual order (drag and drop); it is also the call order. */
+    var position: Long = 0,
 )
 
 object Prefs {

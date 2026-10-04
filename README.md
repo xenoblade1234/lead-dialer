@@ -9,6 +9,8 @@ Android-App, die eine Lead-Liste automatisch nacheinander anruft.
 3. **Automatisch weiterwählen**: Nach dem Auflegen wird sofort der nächste Lead angerufen. Während des Gesprächs kannst du in die App wechseln, ein Ergebnis antippen (sonst wird das Standard-Ergebnis gespeichert, Standard: Mailbox) und "Nach diesem Anruf stoppen" wählen. **Nach jedem Anruf pausieren**: Ergebnis antippen, dann den nächsten Anruf selbst starten.
 4. **CSV exportieren** speichert alle Leads mit Status, Versuchen und Notizen.
 
+Reihenfolge: Leads am Griff ☰ ziehen (oder lange drücken), die Reihenfolge ist auch die Anruf-Reihenfolge. Zur Seite wischen löscht einen Lead (mit Rückgängig).
+
 Wer wieder angerufen wird: `Neu`, `Rückruf` sowie `Nicht erreicht`/`Mailbox` bis zur eingestellten Max-Anzahl Versuche (Standard 3).
 
 ## Build

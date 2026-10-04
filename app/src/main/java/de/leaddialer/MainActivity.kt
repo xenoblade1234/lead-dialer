@@ -35,10 +35,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private lateinit var db: LeadDb
-    private val adapter = LeadAdapter(onClick = { showLead(it) }, onStartDrag = { touchHelper.startDrag(it) })
+    private val adapter: LeadAdapter = LeadAdapter(onClick = { showLead(it) }, onStartDrag = { touchHelper.startDrag(it) })
 
     /** Drag (handle or long press) reorders, a sideways swipe deletes with undo. */
-    private val touchHelper by lazy {
+    private val touchHelper: ItemTouchHelper by lazy {
         ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN,
             ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,

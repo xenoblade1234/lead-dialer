@@ -11,7 +11,7 @@ Android-App, die eine Lead-Liste automatisch nacheinander anruft.
 
 Reihenfolge: Leads am Griff ☰ ziehen (oder lange drücken), die Reihenfolge ist auch die Anruf-Reihenfolge. Zur Seite wischen löscht einen Lead (mit Rückgängig).
 
-Wer wieder angerufen wird: `Neu`, `Rückruf` sowie `Nicht erreicht`/`Mailbox` bis zur eingestellten Max-Anzahl Versuche (Standard 3).
+Wer wieder angerufen wird: `Neu`, `Rückruf` sowie `Nicht erreicht`/`Mailbox` bis zur eingestellten Max-Anzahl Versuche (Standard 3). Ist niemand mehr offen, steht auf dem Knopf **Noch eine Runde**: wahlweise nur die nicht Erreichten oder alle Leads der Liste nochmal.
 
 ## Build
 

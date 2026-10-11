@@ -55,6 +55,22 @@ class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 3) 
         ).map { it.id }
     }
 
+    /**
+     * Leads for another round once the normal queue is empty, in manual order. Ignores the
+     * attempt limit; [all] also includes leads with a final outcome (Termin, Kein Interesse, ...).
+     */
+    fun roundIds(list: String?, all: Boolean): List<Long> {
+        val where = ArrayList<String>()
+        val args = ArrayList<String>()
+        if (!all) where.add("status IN ('NEU', 'RUECKRUF', 'NICHT_ERREICHT', 'MAILBOX')")
+        if (list != null) {
+            where.add("list = ?")
+            args.add(list)
+        }
+        val clause = if (where.isEmpty()) "" else " WHERE " + where.joinToString(" AND ")
+        return query("SELECT $COLS FROM leads$clause ORDER BY position, id", args.toTypedArray()).map { it.id }
+    }
+
     /** Every list with its lead count, newest import first. */
     fun lists(): List<Pair<String, Int>> =
         readableDatabase.rawQuery("SELECT list, COUNT(*) FROM leads GROUP BY list ORDER BY MAX(id) DESC", null).use { c ->

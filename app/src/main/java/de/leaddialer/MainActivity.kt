@@ -74,6 +74,8 @@ class MainActivity : AppCompatActivity() {
         })
     }
     private var pendingLeadId = -1L
+    /** Explicit call queue for "Noch eine Runde"; null uses the normal queue of open leads. */
+    private var roundIds: LongArray? = null
 
     private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) askListName(uri)
@@ -95,7 +97,7 @@ class MainActivity : AppCompatActivity() {
         b.list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
         b.list.adapter = adapter
         touchHelper.attachToRecyclerView(b.list)
-        b.startButton.setOnClickListener { chooseMode() }
+        b.startButton.setOnClickListener { onStartClicked() }
         b.listButton.setOnClickListener { chooseList() }
         b.emptyText.text = "Noch keine Leads.\n\nOben rechts im Menü: \"CSV importieren\" oder \"Lead hinzufügen\".\n\n" +
             "Die CSV braucht eine Spalte \"Telefon\", optional \"Name\", \"Firma\", \"Notiz\"."
@@ -132,9 +134,50 @@ class MainActivity : AppCompatActivity() {
         b.listButton.text = "Liste: " + (sel?.let { listLabel(it) } ?: "Alle Listen") + "  ▾"
         b.stats.text = "${leads.size} Leads · $open offen · $appointments Termine" +
             if (leads.isNotEmpty()) "\n☰ ziehen zum Sortieren · zur Seite wischen zum Löschen" else ""
-        b.startButton.isEnabled = open > 0
-        b.startButton.text = if (open > 0) "Wählen starten ($open)" else "Keine offenen Leads"
+        // With nobody left in the normal queue the list can still be called again.
+        b.startButton.isEnabled = leads.isNotEmpty()
+        b.startButton.text = when {
+            open > 0 -> "Wählen starten ($open)"
+            leads.isNotEmpty() -> "Noch eine Runde"
+            else -> "Keine Leads"
+        }
         b.emptyText.isVisible = leads.isEmpty()
+    }
+
+    private fun onStartClicked() {
+        if (db.queue(Prefs.maxAttempts(this), selectedList()).isNotEmpty()) {
+            roundIds = null
+            chooseMode()
+        } else {
+            chooseRound()
+        }
+    }
+
+    /** Everyone was called already: ask who gets called again, then continue like a normal start. */
+    private fun chooseRound() {
+        val sel = selectedList()
+        val retry = db.roundIds(sel, all = false)
+        val everyone = db.roundIds(sel, all = true)
+        if (everyone.isEmpty()) return
+        val options = arrayOf(
+            "Nur nicht Erreichte (${retry.size})\nMailbox, Nicht erreicht, Rückruf, Neu",
+            "Alle (${everyone.size})\nAuch Termin, Kein Interesse, Falsche Nummer",
+        )
+        var pick = if (retry.isNotEmpty()) 0 else 1
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Noch eine Runde: wen anrufen?")
+            .setSingleChoiceItems(options, pick) { _, which -> pick = which }
+            .setPositiveButton("Weiter") { _, _ ->
+                val ids = if (pick == 0) retry else everyone
+                if (ids.isEmpty()) {
+                    toast("In dieser Auswahl ist niemand.")
+                } else {
+                    roundIds = ids.toLongArray()
+                    chooseMode()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun chooseList() {
@@ -180,7 +223,10 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, DialerActivity::class.java)
             .putExtra(DialerActivity.EXTRA_LEAD_ID, leadId)
             .putExtra(DialerActivity.EXTRA_AUTO, Prefs.autoMode(this))
-        if (leadId < 0) selectedList()?.let { intent.putExtra(DialerActivity.EXTRA_LIST, it) }
+        if (leadId < 0) {
+            selectedList()?.let { intent.putExtra(DialerActivity.EXTRA_LIST, it) }
+            roundIds?.let { intent.putExtra(DialerActivity.EXTRA_IDS, it) }
+        }
         startActivity(intent)
     }
 

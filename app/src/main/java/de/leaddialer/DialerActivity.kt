@@ -40,6 +40,8 @@ class DialerActivity : AppCompatActivity() {
         const val EXTRA_LIST = "list"
         /** true: dial the next lead by itself after each call; false: wait for an outcome and a tap. */
         const val EXTRA_AUTO = "auto"
+        /** Optional explicit queue of lead ids ("Noch eine Runde"); replaces the normal queue. */
+        const val EXTRA_IDS = "ids"
 
         private const val POLL_MS = 500L
         /** Consecutive idle polls before a call counts as over, so a disconnecting call is not mistaken for idle. */
@@ -135,8 +137,11 @@ class DialerActivity : AppCompatActivity() {
         }
 
         if (saved == null) {
-            queue = if (single) longArrayOf(singleId)
-            else db.queue(Prefs.maxAttempts(this), intent.getStringExtra(EXTRA_LIST)).toLongArray()
+            queue = when {
+                single -> longArrayOf(singleId)
+                else -> intent.getLongArrayExtra(EXTRA_IDS)
+                    ?: db.queue(Prefs.maxAttempts(this), intent.getStringExtra(EXTRA_LIST)).toLongArray()
+            }
             loadLead(dial = auto || single)
         } else {
             queue = saved.getLongArray("queue") ?: LongArray(0)
@@ -207,7 +212,10 @@ class DialerActivity : AppCompatActivity() {
         }
         state = State.READY
         // Outcome and note belong to one lead; a redial of the same lead keeps them.
-        chosen = if (auto) Prefs.defaultOutcome(this) else null
+        // A final outcome (Termin, Kein Interesse, ...) is never overwritten by the auto default,
+        // which matters when "Noch eine Runde" calls everyone again.
+        val retryable = current?.status in setOf(Status.NEU, Status.RUECKRUF, Status.NICHT_ERREICHT, Status.MAILBOX)
+        chosen = if (auto && retryable) Prefs.defaultOutcome(this) else null
         b.noteInput.setText("")
         render()
         if (dial) placeCall()

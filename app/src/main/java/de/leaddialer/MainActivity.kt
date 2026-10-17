@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.tabs.TabLayout
 import de.leaddialer.databinding.ActivityMainBinding
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -87,11 +88,36 @@ class MainActivity : AppCompatActivity() {
         if (granted) startDialer(pendingLeadId) else toast("Ohne Anruf-Berechtigung kann die App nicht wählen.")
     }
 
+    // ---------- "Geplante Anrufe" tab ----------
+    private val planFilePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        runCatching { PlanFile.link(this, uri) }
+            .onSuccess { planner.syncNow() }
+            .onFailure { toast("Datei konnte nicht verknüpft werden: ${it.message}") }
+    }
+    private val plannerPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { planner.render() }
+    private val planner by lazy {
+        PlannerPanel(this, pickFile = { planFilePicker.launch(arrayOf("*/*")) }, askPermission = { plannerPermission.launch(it) })
+    }
+    private val onPlannerTab get() = b.tabs.selectedTabPosition == TAB_PLANNER
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
         db = LeadDb(this)
+
+        b.plannerPane.addView(planner.view)
+        b.tabs.addTab(b.tabs.newTab().setText("Leads"))
+        b.tabs.addTab(b.tabs.newTab().setText("Geplante Anrufe"))
+        b.tabs.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) = showTab()
+            override fun onTabUnselected(tab: TabLayout.Tab) {}
+            override fun onTabReselected(tab: TabLayout.Tab) {}
+        })
+        val startTab = savedInstanceState?.getInt("tab") ?: intent.getIntExtra(EXTRA_TAB, TAB_LEADS)
+        b.tabs.getTabAt(startTab)?.select()
+        showTab()
 
         b.list.layoutManager = LinearLayoutManager(this)
         b.list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
@@ -106,11 +132,27 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        planner.render()
         // Keep the call planner current: re-read the plan file and re-arm the alarm.
-        Thread {
-            runCatching { PlanFile.sync(this) }
-            runCatching { CallScheduler.reschedule(this) }
-        }.start()
+        planner.syncNow(quiet = true)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.hasExtra(EXTRA_TAB)) b.tabs.getTabAt(intent.getIntExtra(EXTRA_TAB, TAB_LEADS))?.select()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt("tab", b.tabs.selectedTabPosition)
+    }
+
+    private fun showTab() {
+        b.leadsPane.isVisible = !onPlannerTab
+        b.plannerPane.isVisible = onPlannerTab
+        if (onPlannerTab) planner.render()
+        // The menu holds lead actions only.
+        invalidateOptionsMenu()
     }
 
     /** The list currently shown and dialed; null means all lists. Falls back to all if it was deleted. */
@@ -239,7 +281,6 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, MENU_IMPORT, 0, "CSV importieren")
         menu.add(0, MENU_ADD, 1, "Lead hinzufügen")
         menu.add(0, MENU_EXPORT, 2, "CSV exportieren")
-        menu.add(0, MENU_PLANNER, 3, "Geplante Anrufe")
         menu.add(0, MENU_SETTINGS, 3, "Einstellungen")
         menu.add(0, MENU_DELETE_LIST, 4, "Diese Liste löschen")
         menu.add(0, MENU_CLEAR, 5, "Alle Leads löschen")
@@ -247,7 +288,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        menu.findItem(MENU_DELETE_LIST)?.isVisible = selectedList() != null
+        menu.setGroupVisible(0, !onPlannerTab)
+        menu.findItem(MENU_DELETE_LIST)?.isVisible = !onPlannerTab && selectedList() != null
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -260,7 +302,6 @@ class MainActivity : AppCompatActivity() {
                 exportLauncher.launch(prefix + "_" + SimpleDateFormat("yyyy-MM-dd", Locale.GERMANY).format(Date()) + ".csv")
             }
             MENU_SETTINGS -> showSettings()
-            MENU_PLANNER -> startActivity(Intent(this, PlannerActivity::class.java))
             MENU_DELETE_LIST -> selectedList()?.let { list ->
                 confirm("Liste \"${listLabel(list)}\" löschen?", "Alle Leads dieser Liste werden gelöscht. Das kann nicht rückgängig gemacht werden.") {
                     db.deleteList(list)
@@ -462,9 +503,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
 
-    private companion object {
+    companion object {
         const val MENU_DELETE_LIST = 6
-        const val MENU_PLANNER = 7
+        const val TAB_LEADS = 0
+        const val TAB_PLANNER = 1
+        /** Intent extra: which tab to open (TAB_LEADS or TAB_PLANNER). */
+        const val EXTRA_TAB = "tab"
         const val MENU_IMPORT = 1
         const val MENU_ADD = 2
         const val MENU_EXPORT = 3

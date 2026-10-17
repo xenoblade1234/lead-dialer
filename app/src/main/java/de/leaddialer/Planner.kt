@@ -65,7 +65,8 @@ object CallScheduler {
         }
         val at = toMillis(up.first)
         if (canScheduleExact(ctx)) {
-            val show = PendingIntent.getActivity(ctx, 1, Intent(ctx, PlannerActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+            val showPlan = Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_PLANNER)
+            val show = PendingIntent.getActivity(ctx, 1, showPlan, PendingIntent.FLAG_IMMUTABLE)
             am.setAlarmClock(AlarmManager.AlarmClockInfo(at, show), fire)
         } else {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, fire)

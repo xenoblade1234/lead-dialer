@@ -21,7 +21,8 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -33,11 +34,6 @@
             android:exported="false"
             android:label="Wählen"
             android:launchMode="singleTop" />
-
-        <activity
-            android:name=".PlannerActivity"
-            android:exported="false"
-            android:label="Geplante Anrufe" />
 
         <!-- Own task so it can appear over the lock screen without pulling the main app along. -->
         <activity

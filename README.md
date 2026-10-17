@@ -19,8 +19,8 @@ Jeder Push auf `main` baut per GitHub Actions eine signierte APK und legt sie un
 
 ## Geplante Anrufe
 
-Menü ⋮ → **Geplante Anrufe**. Anrufe zu festen Zeiten (einmalig oder an Wochentagen). Zur Uhrzeit erscheint ein Vollbild "Anruf an … in 10 s" (auch über der Bildschirmsperre) und wählt dann automatisch; Abbrechen oder sofort anrufen ist möglich.
+Reiter **Geplante Anrufe** oben im Hauptbildschirm. Anrufe zu festen Zeiten (einmalig oder an Wochentagen). Zur Uhrzeit erscheint ein Vollbild "Anruf an … in 10 s" (auch über der Bildschirmsperre) und wählt dann automatisch; Abbrechen oder sofort anrufen ist möglich.
 
-- Eintragen direkt in der App oder über eine verknüpfte Datei (CSV oder Excel, z. B. in Google Drive) mit den Spalten `Name`, `Telefon`, `Tage` (z. B. `Mo, Mi`, `Mo-Fr`, `täglich`, leer = einmalig), `Uhrzeit` (z. B. `09:00`), `Datum` (für einmalige Anrufe, z. B. `24.10.2026`). Die Datei wird bei jedem Öffnen der App und bei jedem geplanten Anruf neu gelesen.
+- Eintragen direkt in der App oder über eine verknüpfte Datei (CSV oder Excel, z. B. in Google Drive) mit den Spalten `Name`, `Telefon`, `Tage` (z. B. `Mo, Mi`, `Mo-Fr`, `täglich`, leer = einmalig), `Uhrzeit` (z. B. `09:00`), `Datum` (für einmalige Anrufe, z. B. `24.10.2026`; in der App leer = heute). Die Datei wird bei jedem Öffnen der App und bei jedem geplanten Anruf neu gelesen.
 - Einmalig erlauben: Anrufe, Benachrichtigungen, Vollbild-Benachrichtigungen, "Über anderen Apps einblenden", Akku-Optimierung aus. Der Bildschirm "Geplante Anrufe" zeigt, was fehlt.
 - War das Handy zur Uhrzeit aus, wird der Anruf nicht nachgeholt, sondern als verpasst angezeigt.

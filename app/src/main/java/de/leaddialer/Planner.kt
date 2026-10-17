@@ -75,7 +75,7 @@ object CallScheduler {
     /** Alarm went off: mark the due calls as handled and bring up the call screen. */
     fun onAlarm(ctx: Context, ids: LongArray, at: Long) {
         val db = LeadDb(ctx)
-        val due = ids.mapNotNull { db.schedule(it) }.filter { it.enabled && it.lastFired < at }
+        val due = ids.toList().mapNotNull { db.schedule(it) }.filter { it.enabled && it.lastFired < at }
         due.forEach { s ->
             s.lastFired = at
             if (s.days == 0) s.enabled = false

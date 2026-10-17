@@ -106,6 +106,11 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        // Keep the call planner current: re-read the plan file and re-arm the alarm.
+        Thread {
+            runCatching { PlanFile.sync(this) }
+            runCatching { CallScheduler.reschedule(this) }
+        }.start()
     }
 
     /** The list currently shown and dialed; null means all lists. Falls back to all if it was deleted. */
@@ -234,6 +239,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, MENU_IMPORT, 0, "CSV importieren")
         menu.add(0, MENU_ADD, 1, "Lead hinzufügen")
         menu.add(0, MENU_EXPORT, 2, "CSV exportieren")
+        menu.add(0, MENU_PLANNER, 3, "Geplante Anrufe")
         menu.add(0, MENU_SETTINGS, 3, "Einstellungen")
         menu.add(0, MENU_DELETE_LIST, 4, "Diese Liste löschen")
         menu.add(0, MENU_CLEAR, 5, "Alle Leads löschen")
@@ -254,6 +260,7 @@ class MainActivity : AppCompatActivity() {
                 exportLauncher.launch(prefix + "_" + SimpleDateFormat("yyyy-MM-dd", Locale.GERMANY).format(Date()) + ".csv")
             }
             MENU_SETTINGS -> showSettings()
+            MENU_PLANNER -> startActivity(Intent(this, PlannerActivity::class.java))
             MENU_DELETE_LIST -> selectedList()?.let { list ->
                 confirm("Liste \"${listLabel(list)}\" löschen?", "Alle Leads dieser Liste werden gelöscht. Das kann nicht rückgängig gemacht werden.") {
                     db.deleteList(list)
@@ -457,6 +464,7 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val MENU_DELETE_LIST = 6
+        const val MENU_PLANNER = 7
         const val MENU_IMPORT = 1
         const val MENU_ADD = 2
         const val MENU_EXPORT = 3

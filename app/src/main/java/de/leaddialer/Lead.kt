@@ -47,6 +47,26 @@ object Prefs {
         prefs(c).edit().putBoolean("autoMode", auto).apply()
     }
 
+    /** Linked plan file (content URI with a persisted read grant), or null. */
+    fun planUri(c: Context): String? = prefs(c).getString("planUri", null)
+
+    fun setPlanUri(c: Context, uri: String?) {
+        prefs(c).edit().putString("planUri", uri).apply()
+    }
+
+    fun planLoadedAt(c: Context) = prefs(c).getLong("planLoadedAt", 0L)
+
+    fun setPlanLoadedAt(c: Context, ms: Long) {
+        prefs(c).edit().putLong("planLoadedAt", ms).apply()
+    }
+
+    /** When the planner last looked ahead; calls planned between this and a reboot count as missed. */
+    fun planLastCheck(c: Context) = prefs(c).getLong("planLastCheck", 0L)
+
+    fun setPlanLastCheck(c: Context, ms: Long) {
+        prefs(c).edit().putLong("planLastCheck", ms).apply()
+    }
+
     /** Selected list on the main screen; null means all lists. */
     fun selectedList(c: Context): String? = prefs(c).getString("selectedList", null)
 

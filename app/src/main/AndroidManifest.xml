@@ -2,6 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.CALL_PHONE" />
+    <!-- Call planner -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
@@ -25,5 +33,36 @@
             android:exported="false"
             android:label="Wählen"
             android:launchMode="singleTop" />
+
+        <activity
+            android:name=".PlannerActivity"
+            android:exported="false"
+            android:label="Geplante Anrufe" />
+
+        <!-- Own task so it can appear over the lock screen without pulling the main app along. -->
+        <activity
+            android:name=".CallAlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="Geplanter Anruf"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity="de.leaddialer.plannedcall"
+            android:turnScreenOn="true" />
+
+        <receiver
+            android:name=".PlannedCallReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".PlannerBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

@@ -6,7 +6,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 3) {
+class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 4) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -23,6 +23,7 @@ class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 3) 
                 position INTEGER NOT NULL DEFAULT 0
             )"""
         )
+        createSchedules(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -33,7 +34,98 @@ class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 3) 
             db.execSQL("ALTER TABLE leads ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
             db.execSQL("UPDATE leads SET position = id")
         }
+        // v4 adds the call planner.
+        if (oldVersion < 4) createSchedules(db)
     }
+
+    private fun createSchedules(db: SQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL DEFAULT '',
+                phone TEXT NOT NULL,
+                minute INTEGER NOT NULL,
+                days INTEGER NOT NULL DEFAULT 0,
+                date TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                last_fired INTEGER NOT NULL DEFAULT 0,
+                from_file INTEGER NOT NULL DEFAULT 0
+            )"""
+        )
+    }
+
+    // ---------- planned calls ----------
+
+    fun schedules(): List<Schedule> = scheduleQuery("SELECT $S_COLS FROM schedules ORDER BY minute, id", emptyArray())
+
+    fun schedule(id: Long): Schedule? = scheduleQuery("SELECT $S_COLS FROM schedules WHERE id = ?", arrayOf(id.toString())).firstOrNull()
+
+    /** Inserts when [s] has no id yet, otherwise updates. Returns the id. */
+    fun saveSchedule(s: Schedule): Long {
+        val v = ContentValues().apply {
+            put("name", s.name)
+            put("phone", s.phone)
+            put("minute", s.minuteOfDay)
+            put("days", s.days)
+            put("date", s.date)
+            put("enabled", if (s.enabled) 1 else 0)
+            put("last_fired", s.lastFired)
+            put("from_file", if (s.fromFile) 1 else 0)
+        }
+        if (s.id == 0L) s.id = writableDatabase.insert("schedules", null, v)
+        else writableDatabase.update("schedules", v, "id = ?", arrayOf(s.id.toString()))
+        return s.id
+    }
+
+    fun deleteSchedule(id: Long) {
+        writableDatabase.delete("schedules", "id = ?", arrayOf(id.toString()))
+    }
+
+    /**
+     * Replaces all schedules from the plan file with [plan]. Entries that are still in the file
+     * keep their on/off switch and their last handled time, so a reload never fires a call twice.
+     */
+    fun replaceFileSchedules(plan: List<Schedule>) {
+        val old = schedules().filter { it.fromFile }.associateBy { it.key }
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("schedules", "from_file = 1", null)
+            for (s in plan) {
+                s.id = 0
+                s.fromFile = true
+                old[s.key]?.let { prev ->
+                    s.enabled = prev.enabled
+                    s.lastFired = prev.lastFired
+                }
+                saveSchedule(s)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    private fun scheduleQuery(sql: String, args: Array<String>): List<Schedule> =
+        readableDatabase.rawQuery(sql, args).use { c ->
+            val out = ArrayList<Schedule>()
+            while (c.moveToNext()) {
+                out.add(
+                    Schedule(
+                        id = c.getLong(0),
+                        name = c.getString(1) ?: "",
+                        phone = c.getString(2) ?: "",
+                        minuteOfDay = c.getInt(3),
+                        days = c.getInt(4),
+                        date = c.getString(5),
+                        enabled = c.getInt(6) != 0,
+                        lastFired = c.getLong(7),
+                        fromFile = c.getInt(8) != 0,
+                    )
+                )
+            }
+            out
+        }
 
     /** All leads, or only those of one list when [list] is not null. */
     fun all(list: String? = null): List<Lead> =
@@ -186,5 +278,6 @@ class LeadDb(context: Context) : SQLiteOpenHelper(context, "leads.db", null, 3) 
 
     private companion object {
         const val COLS = "id, name, phone, company, note, status, attempts, last_call, list, position"
+        const val S_COLS = "id, name, phone, minute, days, date, enabled, last_fired, from_file"
     }
 }

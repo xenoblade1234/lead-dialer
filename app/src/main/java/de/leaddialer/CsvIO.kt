@@ -38,12 +38,15 @@ object CsvIO {
         return t.count { it.isDigit() } in 6..15
     }
 
-    fun parse(text: String): List<Lead> {
+    fun parse(text: String): List<Lead> = parseRows(rowsOf(text))
+
+    /** CSV text as rows of cells; the delimiter (; , or tab) is guessed from the first lines. */
+    fun rowsOf(text: String): List<List<String>> {
         val lines = text.lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return emptyList()
         val sample = lines.take(10)
         val delim = listOf(';', ',', '\t').maxByOrNull { d -> sample.sumOf { l -> l.count { it == d } } } ?: ';'
-        return parseRows(lines.map { split(it, delim) })
+        return lines.map { split(it, delim) }
     }
 
     /** Excel workbook: the first sheet that yields any leads. */

@@ -16,6 +16,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -89,14 +90,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------- "Geplante Anrufe" tab ----------
-    private val planFilePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    private val planFilePicker: ActivityResultLauncher<Array<String>> = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
         runCatching { PlanFile.link(this, uri) }
             .onSuccess { planner.syncNow() }
             .onFailure { toast("Datei konnte nicht verknüpft werden: ${it.message}") }
     }
-    private val plannerPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { planner.render() }
-    private val planner by lazy {
+    private val plannerPermission: ActivityResultLauncher<String> = registerForActivityResult(ActivityResultContracts.RequestPermission()) { planner.render() }
+    private val planner: PlannerPanel by lazy {
         PlannerPanel(this, pickFile = { planFilePicker.launch(arrayOf("*/*")) }, askPermission = { plannerPermission.launch(it) })
     }
     private val onPlannerTab get() = b.tabs.selectedTabPosition == TAB_PLANNER
